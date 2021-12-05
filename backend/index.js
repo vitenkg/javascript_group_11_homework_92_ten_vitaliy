@@ -33,8 +33,21 @@ app.ws('/chat', async (ws, req) => {
     username,
     connectionId: id,
   }, );
-  activeUsers.sort();
 
+  console.log('client connected id=' + id);
+
+  activeUsers.sort((a, b) => {
+    const nameA = a.username.toLowerCase();
+    const nameB = b.username.toLowerCase();
+
+    if (nameA < nameB) return -1
+
+    if (nameA > nameB) return 1
+
+    return 0
+  });
+
+  console.log(activeUsers);
   const messages = await Chat.find().sort({datetime: 1}).limit(30).populate('user', 'username');
 
   ws.send(JSON.stringify({
@@ -42,7 +55,6 @@ app.ws('/chat', async (ws, req) => {
     messages,
     activeUsers,
   }));
-
 
   ws.on('message', async msg => {
     const decoded = JSON.parse(msg);
@@ -88,7 +100,6 @@ app.ws('/chat', async (ws, req) => {
     activeUsers = activeUsers.filter(user => user.username !== username);
     console.log('Client was disconnected id = ' + id);
     console.log('Users: ', activeUsers);
-    console.log('client connected id=' + id);
   });
 
 });
