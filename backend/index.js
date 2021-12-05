@@ -23,14 +23,16 @@ const activeConnections = {};
 let activeUsers = [];
 
 app.ws('/chat', async (ws, req) => {
-  const id = nanoid();
-  activeConnections[id] = ws;
-
   const user = await User.findOne(req.query);
-
   let username = user.username;
 
-  activeUsers.push(username);
+  const id = nanoid();
+
+  activeConnections[id] = ws;
+  activeUsers.push({
+    username,
+    connectionId: id,
+  }, );
   activeUsers.sort();
 
   const messages = await Chat.find().sort({datetime: 1}).limit(30).populate('user', 'username');
@@ -40,6 +42,7 @@ app.ws('/chat', async (ws, req) => {
     messages,
     activeUsers,
   }));
+
 
   ws.on('message', async msg => {
     const decoded = JSON.parse(msg);
@@ -63,12 +66,14 @@ app.ws('/chat', async (ws, req) => {
         }
 
         const newMessage = await Chat.findOne({datetime: date}).populate('user', 'username');
-        console.log('New Message: ', newMessage);
+
         Object.keys(activeConnections).forEach(key => {
           const connection = activeConnections[key];
+          console.log(key, connection);
           connection.send(JSON.stringify({
             type: 'NEW_MESSAGE',
             message: newMessage,
+            activeUsers,
           }));
         });
         break;
@@ -80,10 +85,12 @@ app.ws('/chat', async (ws, req) => {
 
   ws.on('close', () => {
     delete activeConnections[id];
-    activeUsers = activeUsers.filter(user => user !== username);
+    activeUsers = activeUsers.filter(user => user.username !== username);
     console.log('Client was disconnected id = ' + id);
+    console.log('Users: ', activeUsers);
+    console.log('client connected id=' + id);
   });
-  console.log('client connected id=' + id);
+
 });
 
 const run = async () => {
