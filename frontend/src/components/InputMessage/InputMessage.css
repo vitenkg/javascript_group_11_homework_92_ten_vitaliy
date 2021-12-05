@@ -1,0 +1,11 @@
+.WriteMessage {
+    position: fixed;
+    width: 880px;
+    bottom: 20px;
+    left: 60%;
+    transform: translate(-50%);
+}
+
+#InputPost {
+    width: 100%;
+}
