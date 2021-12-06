@@ -90,57 +90,63 @@ app.ws('/chat', async (ws, req) => {
 
         let newMessage = await Chat.findOne({datetime: date}).populate('user', 'username');
 
-        Object.keys(activeConnections).forEach(key => {
-          const connection = activeConnections[key];
-          if (newMessage.message[0] === '@') {
-            const findUser = newMessage.message.substr(1, newMessage.message.indexOf(':') - 1);
-            newMessage.message = newMessage.message.substr(newMessage.message.indexOf(':') + 1, newMessage.message.length)
+        if (newMessage.message[0] === '@') {
+          const findUser = newMessage.message.substr(1, newMessage.message.indexOf(':') - 1);
+          newMessage.message = newMessage.message.substr(newMessage.message.indexOf(':') + 1, newMessage.message.length);
+
+          Object.keys(activeConnections).forEach(key => {
+            const connection = activeConnections[key];
+
             activeUsers.map(users => {
-              if (((users.username === findUser) && (users.connectionId === key)) || (users.username === username)){
-                connection.send(JSON.stringify({
-                  type: 'NEW_MESSAGE',
-                  message: newMessage,
-                  activeUsers,
-                }));
+                if (((users.username === findUser) && (users.connectionId === key))) {
+                  console.log('send to current user');
+                  connection.send(JSON.stringify({
+                    type: 'NEW_MESSAGE',
+                    message: newMessage,
+                    activeUsers,
+                  }))
+                } else {
+                  console.log('send to all user');
+                  connection.send(JSON.stringify({
+                    type: 'NEW_MESSAGE',
+                    message: newMessage,
+                    activeUsers,
+                  }));
+                }
               }
-            });
-
-          } else {
-            connection.send(JSON.stringify({
-              type: 'NEW_MESSAGE',
-              message: newMessage,
-              activeUsers,
-            }));
+            )})};
+            break;
+          default:
+            console.log('Unknown Type: ', decoded.type);
+            break;
           }
+        }
+      )
+        ;
+
+        ws.on('close', (event) => {
+          console.log(event);
+          delete activeConnections[id];
+          activeUsers = activeUsers.filter(user => user.username !== username);
+          console.log('Client was disconnected id = ' + id);
+          console.log('Users: ', activeUsers);
         });
-        break;
-      default:
-        console.log('Unknown Type: ', decoded.type);
-        break;
+
     }
-  });
+  )
+    ;
 
-  ws.on('close', (event) => {
-    console.log(event);
-    delete activeConnections[id];
-    activeUsers = activeUsers.filter(user => user.username !== username);
-    console.log('Client was disconnected id = ' + id);
-    console.log('Users: ', activeUsers);
-  });
+    const run = async () => {
+      await mongoose.connect(config.db.url);
 
-});
+      app.listen(port, () => {
+        console.log(`Server started on ${port} port`);
+      });
 
-const run = async () => {
-  await mongoose.connect(config.db.url);
+      exitHook(() => {
+        console.log('Mongo Exiting...');
+        mongoose.disconnect();
+      });
+    };
 
-  app.listen(port, () => {
-    console.log(`Server started on ${port} port`);
-  });
-
-  exitHook(() => {
-    console.log('Mongo Exiting...');
-    mongoose.disconnect();
-  });
-};
-
-run().catch(e => console.error(e));
+    run().catch(e => console.error(e));
