@@ -58,6 +58,8 @@ const Chat = () => {
         ws.current.onmessage = event => {
             const decode = JSON.parse(event.data);
 
+            console.log(decode);
+
             if (decode.type === 'NEW_MESSAGE') {
                 setMessages(prev => [
                     ...prev,
@@ -99,9 +101,18 @@ const Chat = () => {
             } else {
                     console.log('потеря соединения');
             }
+            ws.current.close(1001);
         };
 
+        if (!users) ws.current.close(1001)
+
     }, []);
+
+    const sendTo = text => {
+        const mes = `@${text}: ${message}`;
+        setMessage(mes);
+        console.log(mes);
+    }
 
     const drawer = (
         <div>
@@ -109,7 +120,9 @@ const Chat = () => {
             <Divider/>
             <List>
                 {activeUsers && activeUsers.map((text, index) => (
-                    <ListItem button key={index}>
+                    <ListItem button key={index}
+                        onClick={() => sendTo(text)}
+                    >
                         <ListItemText primary={text}/>
                     </ListItem>
                 ))}
