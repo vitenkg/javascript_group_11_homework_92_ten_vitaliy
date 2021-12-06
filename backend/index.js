@@ -32,7 +32,7 @@ app.ws('/chat', async (ws, req) => {
   activeUsers.push({
     username,
     connectionId: id,
-  }, );
+  },);
 
   console.log('client connected id=' + id);
 
@@ -47,12 +47,23 @@ app.ws('/chat', async (ws, req) => {
     return 0
   });
 
-  console.log(activeUsers);
   const messages = await Chat.find().sort({datetime: 1}).limit(30).populate('user', 'username');
+
+  console.log(messages);
+
+
+  const ownMessages = messages.map(message => {
+    if (message.message[0] === '@') {
+      const findUser = message.message.substr(1, message.message.indexOf(':') - 1);
+      message.message = message.message.substr(message.message.indexOf(':') + 1, message.message.length)
+      if ((username === message.user.username) || (findUser === message.user.username)) return message;
+    }
+    return message;
+  });
 
   ws.send(JSON.stringify({
     type: 'CONNECTED',
-    messages,
+    messages: ownMessages,
     activeUsers,
   }));
 
@@ -61,7 +72,7 @@ app.ws('/chat', async (ws, req) => {
 
     switch (decoded.type) {
       case 'CREATE_MESSAGE':
-        const date = dayjs (new Date());
+        const date = dayjs(new Date());
 
         const createMessage = {
           message: decoded.message,
@@ -77,16 +88,30 @@ app.ws('/chat', async (ws, req) => {
           console.log(e);
         }
 
-        const newMessage = await Chat.findOne({datetime: date}).populate('user', 'username');
+        let newMessage = await Chat.findOne({datetime: date}).populate('user', 'username');
 
         Object.keys(activeConnections).forEach(key => {
           const connection = activeConnections[key];
-          console.log(key, connection);
-          connection.send(JSON.stringify({
-            type: 'NEW_MESSAGE',
-            message: newMessage,
-            activeUsers,
-          }));
+          if (newMessage.message[0] === '@') {
+            const findUser = newMessage.message.substr(1, newMessage.message.indexOf(':') - 1);
+            newMessage.message = newMessage.message.substr(newMessage.message.indexOf(':') + 1, newMessage.message.length)
+            activeUsers.map(users => {
+              if (((users.username === findUser) && (users.connectionId === key)) || (users.username === username)){
+                connection.send(JSON.stringify({
+                  type: 'NEW_MESSAGE',
+                  message: newMessage,
+                  activeUsers,
+                }));
+              }
+            });
+
+          } else {
+            connection.send(JSON.stringify({
+              type: 'NEW_MESSAGE',
+              message: newMessage,
+              activeUsers,
+            }));
+          }
         });
         break;
       default:
@@ -95,7 +120,8 @@ app.ws('/chat', async (ws, req) => {
     }
   });
 
-  ws.on('close', () => {
+  ws.on('close', (event) => {
+    console.log(event);
     delete activeConnections[id];
     activeUsers = activeUsers.filter(user => user.username !== username);
     console.log('Client was disconnected id = ' + id);
